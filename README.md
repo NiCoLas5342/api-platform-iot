@@ -12,3 +12,19 @@ npm : tutoriel -> https://github.com/jankolkmeier/xbee-api
 yarn : site web pour l'installation -> https://yarnpkg.com/lang/en/
 
 2 - Prise en main XCTU avec xbee
+
+Brancher les 2 modules Xbee en USB sur votre ordinateur, si ils ne sont pas reconnu installer le driver The CP210x USB to UART Bridge Virtual COM Port (VCP) drivers : 
+https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers
+
+Il faut ensuite avoir un Xbee en controlleur et l'autre en enddevice et leur donner le même PAN ID.
+
+Donner ensuite l'adresse mac de l'enddevice au controlleur pour qu'il puisse communiquer avec lui.
+
+Creation de frames de commande AT : 
+
+Aller sur le controlleur et cliquer sur la console, cliquer sur ajouter une frame, selectionner une frame de type 0x17, ajouter l'adresse mac du enddevice.
+Dans le champs AT Command ajouter en ASCII le numero du Pin sur lequel est connecté votre LED par exemple (D0). Et donner en parametre l'orde a executer par exemple éteindre (0).
+
+Vous pouvez ensuite exécuter les frames créer en lançant la séquence.
+
+Pour passer en mode API, il faut Activer AP à (1) Enabled.
