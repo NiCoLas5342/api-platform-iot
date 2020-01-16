@@ -8,7 +8,7 @@ var xbeeAPI = new xbee_api.XBeeAPI({
 });
 
 
-let serialport = new SerialPort("/dev/ttyUSB1", {
+let serialport = new SerialPort("COM3", {
   baudRate: 9600,
 }, function (err) {
   if (err) {
@@ -67,7 +67,7 @@ xbeeAPI.parser.on("data", function (frame) {
 
 
   } else if (C.FRAME_TYPE.REMOTE_COMMAND_RESPONSE === frame.type) {
-    
+
   } else {
     console.debug(frame);
     let dataReceived = String.fromCharCode.apply(null, frame.commandData)
