@@ -2,7 +2,7 @@ const io = require('socket.io')();
 var SerialPort = require('serialport');
 var xbee_api = require('xbee-api');
 var C = xbee_api.constants;
-
+const request = require('request');
 var xbeeAPI = new xbee_api.XBeeAPI({
   api_mode: 2
 });
@@ -22,7 +22,7 @@ xbeeAPI.builder.pipe(serialport);
 serialport.on("open", function () {
   var frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.AT_COMMAND,
-    command: "NI",
+    command: "SL", //Mac address source low
     commandParameter: [],
   };
 
@@ -31,7 +31,7 @@ serialport.on("open", function () {
   frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.REMOTE_AT_COMMAND_REQUEST,
     destination64: "FFFFFFFFFFFFFFFF",
-    command: "NI",
+    command: "SL",//SH(source high)
     commandParameter: [],
   };
   xbeeAPI.builder.write(frame_obj);
@@ -97,8 +97,24 @@ io.on('connection', (client) => {
 });
 
 const port = 8000;
-io.listen(port);
+//io.listen(port);
 console.log('listening on port ', port);
+//var json = io.listen(port).toString();
+//certificate
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
+// get salleID with device mac address
+request.get('https://localhost:8443/salles', { json: true }, (err, res, body) => {
+  if (err) { return console.log(err); }
+  var salles = body;
+  console.log(salles[0]);
+  console.log(Object.keys(salles[0])[1] + ":" + Object.values(salles[0])[1]);
+  //console.log(body.explanation);
+});
+//var salleID;
+// post person with salleID
+
+
+
 //
 // serial_xbee.on("data", function(data) {
 //     console.log(data.type);
