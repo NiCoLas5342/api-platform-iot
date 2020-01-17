@@ -22,7 +22,7 @@ xbeeAPI.builder.pipe(serialport);
 serialport.on("open", function () {
   var frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.AT_COMMAND,
-    command: "SL", //Mac address source low
+    command: "SL", //Mac address source low  or d0 (for entry button)  or d1 (for exit button)
     commandParameter: [],
   };
 
@@ -31,7 +31,7 @@ serialport.on("open", function () {
   frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.REMOTE_AT_COMMAND_REQUEST,
     destination64: "FFFFFFFFFFFFFFFF",
-    command: "SL",//SH(source high)
+    command: "SL",//SH(source high) or d0 (for entry button)  or d1 (for exit button)
     commandParameter: [],
   };
   xbeeAPI.builder.write(frame_obj);
