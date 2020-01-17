@@ -41,9 +41,22 @@ class Salle
      */
     private $batiment;
 
+    /**
+     * @ORM\OneToMany(targetEntity="App\Entity\Device", mappedBy="salle")
+     */
+    private $devices;
+
+    /**
+     * @ORM\OneToMany(targetEntity="App\Entity\History", mappedBy="salle")
+     */
+    private $histories;
+
     public function __construct()
     {
         $this->personnes = new ArrayCollection();
+        $this->portes = new ArrayCollection();
+        $this->devices = new ArrayCollection();
+        $this->histories = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -114,6 +127,68 @@ class Salle
     public function setBatiment(?Batiment $batiment): self
     {
         $this->batiment = $batiment;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|Device[]
+     */
+    public function getDevices(): Collection
+    {
+        return $this->devices;
+    }
+
+    public function addDevice(Device $device): self
+    {
+        if (!$this->devices->contains($device)) {
+            $this->devices[] = $device;
+            $device->setSalle($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDevice(Device $device): self
+    {
+        if ($this->devices->contains($device)) {
+            $this->devices->removeElement($device);
+            // set the owning side to null (unless already changed)
+            if ($device->getSalle() === $this) {
+                $device->setSalle(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|History[]
+     */
+    public function getHistories(): Collection
+    {
+        return $this->histories;
+    }
+
+    public function addHistory(History $history): self
+    {
+        if (!$this->histories->contains($history)) {
+            $this->histories[] = $history;
+            $history->setSalle($this);
+        }
+
+        return $this;
+    }
+
+    public function removeHistory(History $history): self
+    {
+        if ($this->histories->contains($history)) {
+            $this->histories->removeElement($history);
+            // set the owning side to null (unless already changed)
+            if ($history->getSalle() === $this) {
+                $history->setSalle(null);
+            }
+        }
 
         return $this;
     }
