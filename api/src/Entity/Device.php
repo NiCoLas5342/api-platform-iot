@@ -3,9 +3,37 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use ApiPlatform\Core\Annotation\ApiResource;
+use App\Resolver\DeviceCollectionResolver;
+use App\Resolver\DeviceResolver;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 /**
  * @ORM\Entity(repositoryClass="App\Repository\DeviceRepository")
+ * @ApiResource(graphql={
+ *     "retrievedQuery"={
+ *         "item_query"=DeviceResolver::class
+ *     },
+ *     "notRetrievedQuery"={
+ *         "item_query"=DeviceResolver::class,
+ *         "args"={}
+ *     },
+ *     "withDefaultArgsNotRetrievedQuery"={
+ *         "item_query"=DeviceResolver::class,
+ *         "read"=false
+ *     },
+ *     "withCustomArgsQuery"={
+ *         "item_query"=DeviceResolver::class,
+ *         "args"={
+ *             "id"={"type"="ID!"},
+ *             "log"={"type"="Boolean!", "description"="Is logging activated?"},
+ *             "logDate"={"type"="DateTime"}
+ *         }
+ *     },
+ *     "collectionQuery"={
+ *         "collection_query"=DeviceCollectionResolver::class
+ *     }
+ * })
  */
 class Device
 {
