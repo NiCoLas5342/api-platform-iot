@@ -4,36 +4,18 @@ namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Core\Annotation\ApiResource;
-use App\Resolver\DeviceCollectionResolver;
-use App\Resolver\DeviceResolver;
+use ApiPlatform\Core\Annotation\ApiFilter;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\SearchFilter;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 /**
  * @ORM\Entity(repositoryClass="App\Repository\DeviceRepository")
- * @ApiResource(graphql={
- *     "retrievedQuery"={
- *         "item_query"=DeviceResolver::class
- *     },
- *     "notRetrievedQuery"={
- *         "item_query"=DeviceResolver::class,
- *         "args"={}
- *     },
- *     "withDefaultArgsNotRetrievedQuery"={
- *         "item_query"=DeviceResolver::class,
- *         "read"=false
- *     },
- *     "withCustomArgsQuery"={
- *         "item_query"=DeviceResolver::class,
- *         "args"={
- *             "id"={"type"="ID!"},
- *             "log"={"type"="Boolean!", "description"="Is logging activated?"},
- *             "logDate"={"type"="DateTime"}
- *         }
- *     },
- *     "collectionQuery"={
- *         "collection_query"=DeviceCollectionResolver::class
- *     }
- * })
+ * @ApiResource(
+ *     normalizationContext={"groups"={"read"}}
+ *     ,denormalizationContext={"groups"={"read"}}
+ *     ,attributes={"filters"={"Device.macAddress"}}
+ *     )
+ * @ApiFilter(SearchFilter::class, properties={"macAddress": "exact", "onEntryDoor": "exact"})
  */
 class Device
 {
@@ -41,21 +23,25 @@ class Device
      * @ORM\Id()
      * @ORM\GeneratedValue()
      * @ORM\Column(type="integer")
+     * @Groups("read")
      */
     private $id;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Groups("read")
      */
     private $macAddress;
 
     /**
      * @ORM\Column(type="boolean")
+     * @Groups("read")
      */
     private $onEntryDoor;
 
     /**
      * @ORM\ManyToOne(targetEntity="App\Entity\Salle", inversedBy="devices")
+     * @Groups("read")
      */
     private $salle;
 

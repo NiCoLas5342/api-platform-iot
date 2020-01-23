@@ -7,7 +7,6 @@ var xbeeAPI = new xbee_api.XBeeAPI({
   api_mode: 2
 });
 
-
 let serialport = new SerialPort("COM3", {
   baudRate: 9600,
 }, function (err) {
@@ -22,7 +21,7 @@ xbeeAPI.builder.pipe(serialport);
 serialport.on("open", function () {
   var frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.AT_COMMAND,
-    command: "SL", //Mac address source low  or d0 (for entry button)  or d1 (for exit button)
+    command: "NI", //Mac address source low  or d0 (for entry button)  or d1 (for exit button)
     commandParameter: [],
   };
 
@@ -31,7 +30,7 @@ serialport.on("open", function () {
   frame_obj = { // AT Request to be sent
     type: C.FRAME_TYPE.REMOTE_AT_COMMAND_REQUEST,
     destination64: "FFFFFFFFFFFFFFFF",
-    command: "SL",//SH(source high) or d0 (for entry button)  or d1 (for exit button)
+    command: "NI",//SH(source high) or d0 (for entry button)  or d1 (for exit button)
     commandParameter: [],
   };
   xbeeAPI.builder.write(frame_obj);
@@ -39,7 +38,7 @@ serialport.on("open", function () {
 });
 
 // All frames parsed by the XBee will be emitted here
-
+var counter = 0;
 xbeeAPI.parser.on("data", function (frame) {
 
   //on new device is joined, register it
@@ -63,8 +62,79 @@ xbeeAPI.parser.on("data", function (frame) {
 
 
   } else if (C.FRAME_TYPE.ZIGBEE_IO_DATA_SAMPLE_RX === frame.type) {
-
-
+    var macaddress = Object.values(frame)[1];
+    var d0 = Object.values(Object.values(frame)[4])[0]; // entry => if value = 0
+    var d1 = Object.values(Object.values(frame)[4])[1]; // exit => if value = 0
+    var entry = false;
+    var Time = new Date();
+    var salleId = -1;
+    if(d0 == 0) {
+      entry = true;
+      counter == 4 ? counter : counter++;
+    }
+    else if(d1 == 0){
+      entry=false;
+      counter == 0 ? counter : counter--;
+    }
+    //certificate
+    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
+    // get salleID with device mac address
+    request.get('https://localhost:8443/devices?macAddress='+macaddress+'&onEntryDoor='+entry+'', { json: true }, (err, res, body) => {
+      if (err) {
+        return console.log(err);
+      }
+      var devices = body;
+      salleId = Object.values(devices[3])[0]; // salleid
+      salleId = salleId.Split('/')[2];
+    });
+    if(salleId == 1)
+      return console.log("Aucune salle trouvé");
+    // inscription de l'heure d'entrée ou de sortie
+    if(entry && counter < 4){
+      // update de le salle de la personne qui est entré
+      request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = "{\n" +
+          "  \"salle\": \"/salles/" + salleId + "\",\n" +
+          "}";
+      });
+      // heure d'entrée
+      request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = "{\n" +
+          "  \"salle\": \"/salles/" + salleId + "\",\n" +
+          "  \"personne\": \"/personnes/" + counter + "\",\n"+
+          "  \"heureEntry\": " + Time + "\n"+
+          "  \"heureExit\": \"\"\n" +
+          "}";
+      });
+    }else if (!entry && counter > 0){
+      // update de le salle de la personne qui est sortie
+      request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = "{\n" +
+          "  \"salle\": \"/salles/"+salleId+"\",\n" +
+          "}";
+      });
+      // inscription de l'heure de sortie
+      request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = "{\n" +
+          "  \"salle\": \"/salles/"+salleId+"\",\n" +
+          "  \"personne\": \"/personnes/" + counter + "\",\n" +
+          "  \"heureEntry\": \"\"\n" +
+          "  \"heureExit\": " + Time + "\n" +
+          "}";
+      });
+    }
 
   } else if (C.FRAME_TYPE.REMOTE_COMMAND_RESPONSE === frame.type) {
 
@@ -97,19 +167,18 @@ io.on('connection', (client) => {
 });
 
 const port = 8000;
-//io.listen(port);
+io.listen(port);
 console.log('listening on port ', port);
-//var json = io.listen(port).toString();
 //certificate
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
+//process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
 // get salleID with device mac address
-request.get('https://localhost:8443/salles', { json: true }, (err, res, body) => {
-  if (err) { return console.log(err); }
-  var salles = body;
-  console.log(salles[0]);
-  console.log(Object.keys(salles[0])[1] + ":" + Object.values(salles[0])[1]);
+//request.get('https://localhost:8443/salles', { json: true }, (err, res, body) => {
+  //if (err) { return console.log(err); }
+  //var salles = body;
+  //console.log(salles[0]);
+  //console.log(Object.keys(salles[0])[1] + ":" + Object.values(salles[0])[1]);
   //console.log(body.explanation);
-});
+//});
 //var salleID;
 // post person with salleID
 
