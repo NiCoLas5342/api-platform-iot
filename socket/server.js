@@ -3,6 +3,7 @@ var SerialPort = require('serialport');
 var xbee_api = require('xbee-api');
 var C = xbee_api.constants;
 const request = require('request');
+
 var xbeeAPI = new xbee_api.XBeeAPI({
   api_mode: 2
 });
@@ -37,13 +38,17 @@ serialport.on("open", function () {
 
 });
 
-// All frames parsed by the XBee will be emitted here
-var counter = 0;
+//declaration variable globale
+var personneID = 0;
 var salleId = -1;
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
-xbeeAPI.parser.on("data", function (frame) {
-  //on new device is joined, register it
 
+//autorisation certificat
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
+
+
+
+// All frames parsed by the XBee will be emitted here
+xbeeAPI.parser.on("data", function (frame) {
   //on packet received, dispatch event
   //let dataReceived = String.fromCharCode.apply(null, frame.data);
   if (C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET === frame.type) {
@@ -71,76 +76,42 @@ xbeeAPI.parser.on("data", function (frame) {
 
     if(d0 == 0) {
       entry = true;
-      counter == 4 ? counter : counter++;
+      personneID == 4 ? personneID : personneID++;
+
+      // get salleID with device mac address
+      salleId = getSalleId(macaddress, entry);
+      //console.log(salleId);
+      if(salleId == -1)
+        return console.log("Aucune salle trouvé");
+      else{
+        // inscription de l'heure d'entrée ou de sortie
+        if(personneID <= 4){
+          // update de le salle de la personne qui est entré
+          updatePersonne(personneID, salleId);
+          // heure d'entrée
+          registerEntryTime(Time, personneID);
+        }
+      }
     }
     else if(d1 == 0){
       entry=false;
-      counter == 0 ? counter : counter--;
-    }
-    //certificate
-    // get salleID with device mac address
-    request.get('https://localhost:8443/devices?macAddress='+macaddress+'&onEntryDoor='+entry+'', { json: true }, (err, res, body) => {
-      if (err) {
-        return console.log(err);
-      }
-      var devices = body;
-      var device = Object.values(devices)[0];
-      var salle = Object.values(device)[3];
-      salleId = Object.values(salle)[0];
-    });
-    if(salleId == -1)
-      return console.log("Aucune salle trouvé");
-    else{
-      // inscription de l'heure d'entrée ou de sortie
-      if(entry && counter < 4){
-        // update de le salle de la personne qui est entré
-        request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
-          if (err) {
-            return console.log(err);
-          }
-          body = "{\n" +
-            "  \"salle\": \"/salles/" + salleId + "\",\n" +
-            "}";
-          console.log(counter);
-        });
-        // heure d'entrée
-        request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
-          if (err) {
-            return console.log(err);
-          }
-          body = "{\n" +
-            "  \"salle\": \"/salles/" + salleId + "\",\n" +
-            "  \"personne\": \"/personnes/" + counter + "\",\n"+
-            "  \"heureEntry\": " + Time + "\n"+
-            "  \"heureExit\": \"\"\n" +
-            "}";
-        });
-      }else if (!entry && counter > 0){
-        // update de le salle de la personne qui est sortie
-        request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
-          if (err) {
-            return console.log(err);
-          }
-          body = "{\n" +
-            "  \"salle\": \"/salles/"+salleId+"\",\n" +
-            "}";
-          console.log(counter);
-        });
-        // inscription de l'heure de sortie
-        request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
-          if (err) {
-            return console.log(err);
-          }
-          body = "{\n" +
-            "  \"salle\": \"/salles/"+salleId+"\",\n" +
-            "  \"personne\": \"/personnes/" + counter + "\",\n" +
-            "  \"heureEntry\": \"\"\n" +
-            "  \"heureExit\": " + Time + "\n" +
-            "}";
-        });
-      }
-    }
+      personneID == 0 ? personneID : personneID--;
 
+      // get salleID with device mac address
+      salleId = getSalleId(macaddress, entry);
+
+      if(salleId == -1)
+        return console.log("Aucune salle trouvé");
+      else{
+        // inscription de l'heure de sortie
+        if (personneID > 0){
+          // update de le salle de la personne qui est sortie
+          updatePersonneExit(personneID);
+          // inscription de l'heure de sortie
+          registerExitTime(Time, personneID);
+        }
+      }
+    }
   } else if (C.FRAME_TYPE.REMOTE_COMMAND_RESPONSE === frame.type) {
 
   } else {
@@ -150,20 +121,15 @@ xbeeAPI.parser.on("data", function (frame) {
   }
 
 });
+
 let browserClient;
+
 io.on('connection', (client) => {
   console.log(client.client.id);
   browserClient = client;
 
   client.on('subscribeToPad', (interval) => {
     console.log('client is subscribing to timer with interval ', interval);
-    // setInterval(() => {
-    //   client.emit('pad-event', {
-    //     device: "test device",
-    //     data: Math.round(Math.random()) * 2 - 1
-    //   })
-    //   ;
-    // }, Math.random() * 1000);
   });
 
   client.on("disconnect", () => {
@@ -174,40 +140,90 @@ io.on('connection', (client) => {
 const port = 8000;
 io.listen(port);
 console.log('listening on port ', port);
-//certificate
-//process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
-// get salleID with device mac address
-//request.get('https://localhost:8443/salles', { json: true }, (err, res, body) => {
-  //if (err) { return console.log(err); }
-  //var salles = body;
-  //console.log(salles[0]);
-  //console.log(Object.keys(salles[0])[1] + ":" + Object.values(salles[0])[1]);
-  //console.log(body.explanation);
-//});
-//var salleID;
-// post person with salleID
 
+function getSalleId(macaddress, entry) {
+  var parameters = 'macAddress=' + macaddress + '&onEntryDoor=' + entry;
+  apiRequests('get','devices',parameters,null, function (data){
+    var device = data;
+    var salle = Object.values(data)[3];
+    //console.log(salle.id);
+    return salle.id; // salleID
+  });
+}
 
+function updatePersonne(personneID, salleId) {
+  var body = "{\n" +
+    "  \"salle\": \"/salles/" + salleId + "\"\n" +
+    "}";
+  apiRequests('patch','personnes',personneID,body);
+}
 
-//
-// serial_xbee.on("data", function(data) {
-//     console.log(data.type);
-//   // console.log('xbee data received:', data.type);
-//   // client.emit('timer', "pouet");
-// //
-// });
+function updatePersonneExit(personneID){
+  var body = "{\n" +
+    "  \"salle\": \"\"\n" +
+    "}";
+  apiRequests('patch','personnes',personneID,body);
+}
 
-// shepherd.on('ready', function () {
-//   console.log('Server is ready.');
-//
-//   // allow devices to join the network within 60 secs
-//   shepherd.permitJoin(60, function (err) {
-//     if (err)
-//       console.log(err);
-//   });
-// });
-//
-// shepherd.start(function (err) {                // start the server
-//   if (err)
-//     console.log(err);
-// });
+function registerEntryTime(Time, personneID) {
+  var body = "{\n" +
+    "  \"salle\": \"/salles/" + salleId + "\",\n" +
+    "  \"personne\": \"/personnes/" + personneID + "\",\n" +
+    "  \"heureEntry\": " + Time + "\n" +
+    "}";
+  apiRequests('post','histories',null, body);
+}
+
+function registerExitTime(Time, personneID) {
+  var body = "{\n" +
+    "  \"salle\": \"/salles/" + salleId + "\",\n" +
+    "  \"personne\": \"/personnes/" + personneID + "\",\n" +
+    "  \"heureExit\": " + Time + "\n" +
+    "}";
+  apiRequests('post','histories',null, body);
+}
+
+function apiRequests(method, entity, parameters, bodyInfo, callback){
+  if(parameters === undefined || parameters == null){
+    if(method == 'post'){
+      request.post('https://localhost:8443/' + entity +'', {json: true}, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = bodyInfo;
+      });
+    }else if(method == 'get'){
+      request.get('https://localhost:8443/' + entity + '', {json: true}, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        callback(Object.values(body)[0]);
+      });
+    }else if(method == 'patch'){
+      request.patch('https://localhost:8443/' + entity +'', {json: true}, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = bodyInfo;
+      });
+    }
+  }
+  else
+  {
+    if(method == 'get'){
+      request.get('https://localhost:8443/' + entity + '?' + parameters + '', {json: true}, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        callback(Object.values(body)[0]);
+      });
+    }else if(method == 'patch'){
+      request.patch('https://localhost:8443/' + entity + '/' + parameters + '', {json: true}, (err, res, body) => {
+        if (err) {
+          return console.log(err);
+        }
+        body = bodyInfo;
+      });
+    }
+  }
+}
