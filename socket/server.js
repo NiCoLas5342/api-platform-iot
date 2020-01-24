@@ -39,8 +39,9 @@ serialport.on("open", function () {
 
 // All frames parsed by the XBee will be emitted here
 var counter = 0;
+var salleId = -1;
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
 xbeeAPI.parser.on("data", function (frame) {
-
   //on new device is joined, register it
 
   //on packet received, dispatch event
@@ -67,7 +68,7 @@ xbeeAPI.parser.on("data", function (frame) {
     var d1 = Object.values(Object.values(frame)[4])[1]; // exit => if value = 0
     var entry = false;
     var Time = new Date();
-    var salleId = -1;
+
     if(d0 == 0) {
       entry = true;
       counter == 4 ? counter : counter++;
@@ -77,63 +78,67 @@ xbeeAPI.parser.on("data", function (frame) {
       counter == 0 ? counter : counter--;
     }
     //certificate
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
     // get salleID with device mac address
     request.get('https://localhost:8443/devices?macAddress='+macaddress+'&onEntryDoor='+entry+'', { json: true }, (err, res, body) => {
       if (err) {
         return console.log(err);
       }
       var devices = body;
-      salleId = Object.values(devices[3])[0]; // salleid
-      salleId = salleId.Split('/')[2];
+      var device = Object.values(devices)[0];
+      var salle = Object.values(device)[3];
+      salleId = Object.values(salle)[0];
     });
-    if(salleId == 1)
+    if(salleId == -1)
       return console.log("Aucune salle trouvé");
-    // inscription de l'heure d'entrée ou de sortie
-    if(entry && counter < 4){
-      // update de le salle de la personne qui est entré
-      request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
-        if (err) {
-          return console.log(err);
-        }
-        body = "{\n" +
-          "  \"salle\": \"/salles/" + salleId + "\",\n" +
-          "}";
-      });
-      // heure d'entrée
-      request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
-        if (err) {
-          return console.log(err);
-        }
-        body = "{\n" +
-          "  \"salle\": \"/salles/" + salleId + "\",\n" +
-          "  \"personne\": \"/personnes/" + counter + "\",\n"+
-          "  \"heureEntry\": " + Time + "\n"+
-          "  \"heureExit\": \"\"\n" +
-          "}";
-      });
-    }else if (!entry && counter > 0){
-      // update de le salle de la personne qui est sortie
-      request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
-        if (err) {
-          return console.log(err);
-        }
-        body = "{\n" +
-          "  \"salle\": \"/salles/"+salleId+"\",\n" +
-          "}";
-      });
-      // inscription de l'heure de sortie
-      request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
-        if (err) {
-          return console.log(err);
-        }
-        body = "{\n" +
-          "  \"salle\": \"/salles/"+salleId+"\",\n" +
-          "  \"personne\": \"/personnes/" + counter + "\",\n" +
-          "  \"heureEntry\": \"\"\n" +
-          "  \"heureExit\": " + Time + "\n" +
-          "}";
-      });
+    else{
+      // inscription de l'heure d'entrée ou de sortie
+      if(entry && counter < 4){
+        // update de le salle de la personne qui est entré
+        request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
+          if (err) {
+            return console.log(err);
+          }
+          body = "{\n" +
+            "  \"salle\": \"/salles/" + salleId + "\",\n" +
+            "}";
+          console.log(counter);
+        });
+        // heure d'entrée
+        request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
+          if (err) {
+            return console.log(err);
+          }
+          body = "{\n" +
+            "  \"salle\": \"/salles/" + salleId + "\",\n" +
+            "  \"personne\": \"/personnes/" + counter + "\",\n"+
+            "  \"heureEntry\": " + Time + "\n"+
+            "  \"heureExit\": \"\"\n" +
+            "}";
+        });
+      }else if (!entry && counter > 0){
+        // update de le salle de la personne qui est sortie
+        request.patch('https://localhost:8443/personnes/'+counter+'', { json: true }, (err, res, body) => {
+          if (err) {
+            return console.log(err);
+          }
+          body = "{\n" +
+            "  \"salle\": \"/salles/"+salleId+"\",\n" +
+            "}";
+          console.log(counter);
+        });
+        // inscription de l'heure de sortie
+        request.post('https://localhost:8443/histories', { json: true }, (err, res, body) => {
+          if (err) {
+            return console.log(err);
+          }
+          body = "{\n" +
+            "  \"salle\": \"/salles/"+salleId+"\",\n" +
+            "  \"personne\": \"/personnes/" + counter + "\",\n" +
+            "  \"heureEntry\": \"\"\n" +
+            "  \"heureExit\": " + Time + "\n" +
+            "}";
+        });
+      }
     }
 
   } else if (C.FRAME_TYPE.REMOTE_COMMAND_RESPONSE === frame.type) {
